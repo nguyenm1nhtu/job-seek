@@ -34,3 +34,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# postgres
+query.pgsql
+
+# gcs
+job-seek-120604-05bfe6d439d7.json
