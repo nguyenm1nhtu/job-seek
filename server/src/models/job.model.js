@@ -7,9 +7,7 @@ module.exports = (sequelize) => {
         static associate(models) {
             Job.belongsTo(models.Recruiter, { foreignKey: 'recruiter_id', onDelete: 'RESTRICT' });
             Job.belongsTo(models.Company, { foreignKey: 'company_id', onDelete: 'RESTRICT' });
-            Job.belongsTo(models.Category, { foreignKey: 'category_id' });
-            Job.hasMany(models.Application, { foreignKey: 'job_id', onDelete: 'CASCADE' });
-            Job.hasMany(models.FavouriteJob, { foreignKey: 'job_id', onDelete: 'CASCADE' });
+            Job.belongsTo(models.Category, { foreignKey: 'category_id', onDelete: 'RESTRICT' });
         }
     }
 
@@ -29,31 +27,21 @@ module.exports = (sequelize) => {
                 allowNull: false,
             },
             type: {
-                type: DataTypes.ENUM('immediately', 'urgent', 'other'),
+                type: DataTypes.ENUM('urgent', 'immediately', 'other'),
                 allowNull: false,
             },
             title: {
-                type: DataTypes.STRING(255),
+                type: DataTypes.STRING,
                 allowNull: false,
             },
-            description: {
-                type: DataTypes.TEXT,
-            },
-            requirement: {
-                type: DataTypes.TEXT,
-            },
-            benefit: {
-                type: DataTypes.TEXT,
-            },
-            min_salary: {
-                type: DataTypes.DECIMAL,
-            },
-            max_salary: {
-                type: DataTypes.DECIMAL,
-            },
-            experience: {
-                type: DataTypes.ENUM('intern', 'junior', 'senior', 'lead'),
-            },
+            description: DataTypes.TEXT,
+            requirement: DataTypes.TEXT,
+            benefit: DataTypes.TEXT,
+            min_salary: DataTypes.INTEGER,
+            max_salary: DataTypes.INTEGER,
+            min_experience: DataTypes.INTEGER,
+            max_experience: DataTypes.INTEGER,
+
             status: {
                 type: DataTypes.ENUM('open', 'closed'),
                 defaultValue: 'open',
@@ -61,12 +49,15 @@ module.exports = (sequelize) => {
             required_cv: {
                 type: DataTypes.BOOLEAN,
                 defaultValue: false,
+                allowNull: false,
             },
             category_id: {
                 type: DataTypes.BIGINT,
+                allowNull: false,
             },
             deadline: {
                 type: DataTypes.DATE,
+                allowNull: false,
             },
             limited: {
                 type: DataTypes.INTEGER,
@@ -80,6 +71,24 @@ module.exports = (sequelize) => {
             timestamps: true,
             createdAt: 'created_at',
             updatedAt: 'updated_at',
+            hooks: {
+                beforeCreate: async (job, options) => {
+                    const now = new Date();
+                    const diffDays = Math.ceil((new Date(job.deadline) - now) / (1000 * 60 * 60 * 24));
+                    if (diffDays <= 7) job.type = 'urgent';
+                    else if (diffDays <= 30) job.type = 'immediately';
+                    else job.type = 'other';
+                },
+                beforeUpdate: async (job, options) => {
+                    if (job.changed('deadline')) {
+                        const now = new Date();
+                        const diffDays = Math.ceil((new Date(job.deadline) - now) / (1000 * 60 * 60 * 24));
+                        if (diffDays <= 7) job.type = 'urgent';
+                        else if (diffDays <= 30) job.type = 'immediately';
+                        else job.type = 'other';
+                    }
+                },
+            },
         },
     );
 

@@ -1,52 +1,53 @@
-const express = require('express');
-const createError = require('http-errors');
-const path = require('path');
-const cookieParser = require('cookie-parser');
-const logger = require('morgan');
-const cors = require('cors');
 require('dotenv').config();
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const morgan = require('morgan');
+const compression = require('compression');
+// const { bucket } = require('./config/gcs');
 
-const bucket = require('./config/gcs');
-
-// Route
 const indexRouter = require('./src/routes/index');
-const apiRouter = require('./src/routes/api');
+const apiRouterV1 = require('./src/routes/v1/api');
+const { notFound, errorHandler } = require('./src/middlewares/error');
 
 const app = express();
 
-app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+// Security + CORS
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(
     cors({
-        origin: 'http://localhost:3001',
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        origin:
+            (process.env.CORS_ORIGIN || '')
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean) || true,
         credentials: true,
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
     }),
 );
 
+// Logging
+app.use(morgan('dev'));
+
+// Parsers & cookies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser(process.env.COOKIE_SECRET));
+
+// Compression
+app.use(compression());
+
+// Health & docs
+app.get('/healthz', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+// app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Routes
 app.use('/', indexRouter);
-app.use('/api', apiRouter);
+app.use('/api/v1', apiRouterV1);
 
-// catch 404 and forward to error handler
-app.use(function (req, res, next) {
-    next(createError(404));
-});
-
-// error handler
-app.use(function (err, req, res, next) {
-    // set locals, only providing error in development
-    res.locals.message = err.message;
-    res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-    // render the error page
-    res.status(err.status || 500);
-    res.json({
-        message: err.message,
-        error: req.app.get('env') === 'development' ? err : {},
-    });
-});
+// Error handler
+app.use(notFound);
+app.use(errorHandler);
 
 module.exports = app;
